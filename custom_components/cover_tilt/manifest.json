@@ -1,0 +1,11 @@
+{
+  "domain": "cover_tilt",
+  "name": "Cover Tilt",
+  "version": "0.1.0",
+  "documentation": "https://github.com/Jargendas/homeassistant-cover-tilt",
+  "dependencies": [],
+  "codeowners": ["@Jargendas"],
+  "config_flow": true,
+  "requirements": [],
+  "iot_class": "local_push"
+}
