@@ -14,7 +14,16 @@ from homeassistant.components.cover import (
     CoverEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_ENTITY_ID, CONF_NAME, SERVICE_CLOSE_COVER, SERVICE_OPEN_COVER, SERVICE_SET_COVER_POSITION, SERVICE_STOP_COVER, STATE_CLOSING, STATE_OPENING
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    CONF_NAME,
+    SERVICE_CLOSE_COVER,
+    SERVICE_OPEN_COVER,
+    SERVICE_SET_COVER_POSITION,
+    SERVICE_STOP_COVER,
+    STATE_CLOSING,
+    STATE_OPENING,
+)
 from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
@@ -47,6 +56,7 @@ class CoverTiltEntity(CoverEntity):
         self._tilt_position: int | None = None
         self._is_opening = False
         self._is_closing = False
+        self._source_has_tilt = False
         self._unsub_state_change: Callable[[], None] | None = None
 
     @property
@@ -109,6 +119,7 @@ class CoverTiltEntity(CoverEntity):
 
         self._cover_position = state.attributes.get(ATTR_CURRENT_POSITION)
         if ATTR_CURRENT_TILT_POSITION in state.attributes:
+            self._source_has_tilt = True
             self._tilt_position = state.attributes.get(ATTR_CURRENT_TILT_POSITION)
 
         self._is_opening = state.state == STATE_OPENING
@@ -161,8 +172,9 @@ class CoverTiltEntity(CoverEntity):
         await asyncio.sleep(duration)
         await self._call_cover_service(SERVICE_STOP_COVER)
 
-        self._tilt_position = target
-        self.async_write_ha_state()
+        if not self._source_has_tilt:
+            self._tilt_position = target
+            self.async_write_ha_state()
 
     async def _call_cover_service(self, service: str, data: dict | None = None) -> None:
         """Call cover service on source entity."""
