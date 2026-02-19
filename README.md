@@ -1,24 +1,24 @@
 # Cover Tilt
 
-`cover_tilt` ist eine Home-Assistant-Integration, die zu einem bestehenden Cover
-eine zusätzliche Lamellen-/Tilt-Steuerung bereitstellt.
+`cover_tilt` is a Home Assistant integration that adds additional slat/tilt
+control to an existing cover entity.
 
 ## Installation via HACS
 
-1. HACS öffnen.
-2. **Integrationen** auswählen.
-3. Über das Menü **Benutzerdefinierte Repositories** dieses Repository hinzufügen:
+1. Open HACS.
+2. Select **Integrations**.
+3. Add this repository via **Custom repositories**:
    `https://github.com/Jargendas/homeassistant-cover-tilt`
-4. Als Kategorie **Integration** wählen.
-5. **Cover Tilt** installieren und Home Assistant neu starten.
+4. Select the **Integration** category.
+5. Install **Cover Tilt** and restart Home Assistant.
 
-## Einrichtung
+## Setup
 
-1. In Home Assistant zu **Einstellungen → Geräte & Dienste → Integration hinzufügen**.
-2. **Cover Tilt** auswählen.
-3. Folgende Werte setzen:
+1. In Home Assistant, go to **Settings → Devices & Services → Add Integration**.
+2. Select **Cover Tilt**.
+3. Configure:
    - **Name** (optional)
-   - **Cover-Entity** (bestehendes Cover)
-   - **Zeit für volle Lamellenrotation (Sekunden)**
+   - **Cover entity** (existing cover)
+   - **Time for full slat rotation (seconds)**
 
-Danach steht eine neue Cover-Entity mit Tilt-Funktionen zur Verfügung.
+After setup, a new cover entity with tilt functions will be available.
