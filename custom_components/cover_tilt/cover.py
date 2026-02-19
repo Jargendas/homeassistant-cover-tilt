@@ -93,6 +93,13 @@ class CoverTiltEntity(CoverEntity):
         """Return if the cover is closing."""
         return self._is_closing
 
+    @property
+    def is_closed(self) -> bool | None:
+        """Return if the cover is closed."""
+        if self._cover_position is None:
+            return None
+        return self._cover_position == 0
+
     async def async_added_to_hass(self) -> None:
         """Subscribe to source entity state changes."""
         self._sync_from_source_state(self.hass.states.get(self._source_entity_id))
