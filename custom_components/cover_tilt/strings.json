@@ -2,21 +2,21 @@
   "config": {
     "step": {
       "user": {
-        "title": "Cover Tilt konfigurieren",
-        "description": "Wähle ein bestehendes Cover und die Zeit für eine vollständige Lamellenrotation.",
+        "title": "Configure Cover Tilt",
+        "description": "Select an existing cover and set the time for a full slat rotation.",
         "data": {
           "name": "Name",
-          "source_entity_id": "Cover-Entity",
-          "slat_rotation_time": "Zeit für volle Lamellenrotation (Sekunden)"
+          "source_entity_id": "Cover entity",
+          "slat_rotation_time": "Time for full slat rotation (seconds)"
         }
       }
     },
     "error": {
-      "must_be_positive": "Wert muss größer als 0 sein",
-      "single_decimal": "Nur eine Nachkommastelle erlaubt"
+      "must_be_positive": "Value must be greater than 0",
+      "single_decimal": "Only one decimal place is allowed"
     },
     "abort": {
-      "already_configured": "Dieses Cover ist bereits konfiguriert"
+      "already_configured": "This cover is already configured"
     }
   }
 }
