@@ -23,6 +23,8 @@ from homeassistant.const import (
     SERVICE_STOP_COVER,
     STATE_CLOSING,
     STATE_OPENING,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
 )
 from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -56,6 +58,7 @@ class CoverTiltEntity(CoverEntity):
         self._tilt_position: int | None = None
         self._is_opening = False
         self._is_closing = False
+        self._available = True
         self._source_has_tilt = False
         self._unsub_state_change: Callable[[], None] | None = None
 
@@ -100,6 +103,11 @@ class CoverTiltEntity(CoverEntity):
             return None
         return self._cover_position == 0
 
+    @property
+    def available(self) -> bool:
+        """Return if the source entity is available."""
+        return self._available
+
     async def async_added_to_hass(self) -> None:
         """Subscribe to source entity state changes."""
         self._sync_from_source_state(self.hass.states.get(self._source_entity_id))
@@ -122,8 +130,18 @@ class CoverTiltEntity(CoverEntity):
     def _sync_from_source_state(self, state: State | None) -> None:
         """Sync state from the wrapped source entity."""
         if state is None:
+            self._available = False
+            self.async_write_ha_state()
             return
 
+        if state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            self._available = False
+            self._is_opening = False
+            self._is_closing = False
+            self.async_write_ha_state()
+            return
+
+        self._available = True
         self._cover_position = state.attributes.get(ATTR_CURRENT_POSITION)
         if ATTR_CURRENT_TILT_POSITION in state.attributes:
             self._source_has_tilt = True
