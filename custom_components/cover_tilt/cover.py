@@ -58,7 +58,7 @@ class CoverTiltEntity(CoverEntity):
         self._tilt_position: int | None = None
         self._is_opening = False
         self._is_closing = False
-        self._available = True
+        self._available = False
         self._source_has_tilt = False
         self._unsub_state_change: Callable[[], None] | None = None
 
@@ -129,12 +129,7 @@ class CoverTiltEntity(CoverEntity):
     @callback
     def _sync_from_source_state(self, state: State | None) -> None:
         """Sync state from the wrapped source entity."""
-        if state is None:
-            self._available = False
-            self.async_write_ha_state()
-            return
-
-        if state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             self._available = False
             self._is_opening = False
             self._is_closing = False
