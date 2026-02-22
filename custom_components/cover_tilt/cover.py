@@ -29,7 +29,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
-from homeassistant.helpers.service import async_call_from_config
 
 from .const import CONF_SLAT_ROTATION_TIME, CONF_SOURCE_ENTITY_ID
 
@@ -202,12 +201,9 @@ class CoverTiltEntity(CoverEntity):
         if data:
             service_data.update(data)
 
-        await async_call_from_config(
-            self.hass,
-            {
-                "service": f"cover.{service}",
-                "data": service_data,
-            },
+        await self.hass.services.async_call(
+            "cover",
+            service,
+            service_data,
             blocking=True,
-            validate_config=False,
         )
