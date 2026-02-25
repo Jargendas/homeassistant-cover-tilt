@@ -59,6 +59,8 @@ class CoverTiltEntity(CoverEntity):
         self._is_closing = False
         self._available = False
         self._source_has_tilt = False
+        self._performing_tilt_action = False
+        self._performing_position_action = False
         self._unsub_state_change: Callable[[], None] | None = None
 
     @property
@@ -136,10 +138,30 @@ class CoverTiltEntity(CoverEntity):
             return
 
         self._available = True
-        self._cover_position = state.attributes.get(ATTR_CURRENT_POSITION)
+
+        # During tilt actions, don't update position (slat rotation briefly
+        # moves the cover but the virtual position should stay the same).
+        if not self._performing_tilt_action:
+            new_position = state.attributes.get(ATTR_CURRENT_POSITION)
+            old_position = self._cover_position
+            self._cover_position = new_position
+
+            # For external position changes (not initiated by the virtual
+            # entity), update tilt based on movement direction: going up sets
+            # tilt to 100 %, going down sets tilt to 0 %.
+            if (
+                not self._performing_position_action
+                and not self._source_has_tilt
+                and old_position is not None
+                and new_position is not None
+                and old_position != new_position
+            ):
+                self._tilt_position = 100 if new_position > old_position else 0
+
         if ATTR_CURRENT_TILT_POSITION in state.attributes:
             self._source_has_tilt = True
-            self._tilt_position = state.attributes.get(ATTR_CURRENT_TILT_POSITION)
+            if not self._performing_tilt_action and not self._performing_position_action:
+                self._tilt_position = state.attributes.get(ATTR_CURRENT_TILT_POSITION)
 
         self._is_opening = state.state == STATE_OPENING
         self._is_closing = state.state == STATE_CLOSING
@@ -158,11 +180,21 @@ class CoverTiltEntity(CoverEntity):
         await self._call_cover_service(SERVICE_STOP_COVER)
 
     async def async_set_cover_position(self, **kwargs) -> None:
-        """Move cover to a specific position."""
-        await self._call_cover_service(
-            SERVICE_SET_COVER_POSITION,
-            {ATTR_POSITION: kwargs[ATTR_POSITION]},
-        )
+        """Move cover to a specific position, then re-apply saved tilt."""
+        saved_tilt = self._tilt_position
+        self._performing_position_action = True
+        try:
+            await self._call_cover_service(
+                SERVICE_SET_COVER_POSITION,
+                {ATTR_POSITION: kwargs[ATTR_POSITION]},
+            )
+        finally:
+            self._performing_position_action = False
+        # Re-apply tilt after position change (only for simulated tilt).
+        if saved_tilt is not None and not self._source_has_tilt:
+            await self.async_set_cover_tilt_position(
+                **{ATTR_TILT_POSITION: saved_tilt}
+            )
 
     async def async_open_cover_tilt(self, **kwargs) -> None:
         """Open cover tilt fully."""
@@ -187,9 +219,13 @@ class CoverTiltEntity(CoverEntity):
         service = SERVICE_OPEN_COVER if target > current else SERVICE_CLOSE_COVER
         duration = self._rotation_time * abs(target - current) / 100
 
-        await self._call_cover_service(service)
-        await asyncio.sleep(duration)
-        await self._call_cover_service(SERVICE_STOP_COVER)
+        self._performing_tilt_action = True
+        try:
+            await self._call_cover_service(service)
+            await asyncio.sleep(duration)
+            await self._call_cover_service(SERVICE_STOP_COVER)
+        finally:
+            self._performing_tilt_action = False
 
         if not self._source_has_tilt:
             self._tilt_position = target
