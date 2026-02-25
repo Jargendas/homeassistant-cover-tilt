@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Callable
 
 from homeassistant.components.cover import (
@@ -61,6 +62,8 @@ class CoverTiltEntity(CoverEntity):
         self._source_has_tilt = False
         self._performing_tilt_action = False
         self._performing_position_action = False
+        self._movement_start_time: float | None = None
+        self._movement_direction_up: bool | None = None
         self._unsub_state_change: Callable[[], None] | None = None
 
     @property
@@ -142,29 +145,46 @@ class CoverTiltEntity(CoverEntity):
         # During tilt actions, don't update position (slat rotation briefly
         # moves the cover but the virtual position should stay the same).
         if not self._performing_tilt_action:
-            new_position = state.attributes.get(ATTR_CURRENT_POSITION)
-            old_position = self._cover_position
-            self._cover_position = new_position
-
-            # For external position changes (not initiated by the virtual
-            # entity), update tilt based on movement direction: going up sets
-            # tilt to 100 %, going down sets tilt to 0 %.
-            if (
-                not self._performing_position_action
-                and not self._source_has_tilt
-                and old_position is not None
-                and new_position is not None
-                and old_position != new_position
-            ):
-                self._tilt_position = 100 if new_position > old_position else 0
+            self._cover_position = state.attributes.get(ATTR_CURRENT_POSITION)
 
         if ATTR_CURRENT_TILT_POSITION in state.attributes:
             self._source_has_tilt = True
             if not self._performing_tilt_action and not self._performing_position_action:
                 self._tilt_position = state.attributes.get(ATTR_CURRENT_TILT_POSITION)
 
+        # Track movement start/stop for external tilt estimation.
+        was_opening = self._is_opening
+        was_closing = self._is_closing
         self._is_opening = state.state == STATE_OPENING
         self._is_closing = state.state == STATE_CLOSING
+
+        if (
+            not self._performing_tilt_action
+            and not self._performing_position_action
+            and not self._source_has_tilt
+        ):
+            was_moving = was_opening or was_closing
+            is_moving = self._is_opening or self._is_closing
+
+            if is_moving and not was_moving:
+                # External movement started
+                self._movement_start_time = time.monotonic()
+                self._movement_direction_up = self._is_opening
+            elif is_moving and was_moving and self._is_opening != was_opening:
+                # Direction changed mid-movement
+                if self._movement_start_time is not None:
+                    elapsed = time.monotonic() - self._movement_start_time
+                    self._apply_tilt_from_movement(elapsed, self._movement_direction_up)
+                self._movement_start_time = time.monotonic()
+                self._movement_direction_up = self._is_opening
+            elif not is_moving and was_moving:
+                # External movement stopped
+                if self._movement_start_time is not None:
+                    elapsed = time.monotonic() - self._movement_start_time
+                    self._apply_tilt_from_movement(elapsed, self._movement_direction_up)
+                self._movement_start_time = None
+                self._movement_direction_up = None
+
         self.async_write_ha_state()
 
     async def async_open_cover(self, **kwargs) -> None:
@@ -181,20 +201,37 @@ class CoverTiltEntity(CoverEntity):
 
     async def async_set_cover_position(self, **kwargs) -> None:
         """Move cover to a specific position, then re-apply saved tilt."""
+        target_position = int(kwargs[ATTR_POSITION])
         saved_tilt = self._tilt_position
+        old_position = self._cover_position
         self._performing_position_action = True
         try:
             await self._call_cover_service(
                 SERVICE_SET_COVER_POSITION,
-                {ATTR_POSITION: kwargs[ATTR_POSITION]},
+                {ATTR_POSITION: target_position},
             )
+            await self._wait_for_cover_stop()
         finally:
             self._performing_position_action = False
-        # Re-apply tilt after position change (only for simulated tilt).
-        if saved_tilt is not None and not self._source_has_tilt:
-            await self.async_set_cover_tilt_position(
-                **{ATTR_TILT_POSITION: saved_tilt}
-            )
+
+        if self._source_has_tilt:
+            return
+
+        # Fully up: tilt becomes 0 % (blind will go down next).
+        if target_position == 100:
+            self._tilt_position = 0
+            self.async_write_ha_state()
+            return
+
+        if saved_tilt is None:
+            return
+
+        # Position actually changed → slats have rotated to an end position.
+        if old_position is not None and old_position != target_position:
+            self._tilt_position = 100 if target_position > old_position else 0
+
+        # Re-apply the previously set tilt at the new position.
+        await self.async_set_cover_tilt_position(**{ATTR_TILT_POSITION: saved_tilt})
 
     async def async_open_cover_tilt(self, **kwargs) -> None:
         """Open cover tilt fully."""
@@ -230,6 +267,29 @@ class CoverTiltEntity(CoverEntity):
         if not self._source_has_tilt:
             self._tilt_position = target
             self.async_write_ha_state()
+
+    @callback
+    def _apply_tilt_from_movement(self, elapsed: float, direction_up: bool) -> None:
+        """Estimate tilt change from a movement segment."""
+        tilt_change = elapsed / self._rotation_time * 100
+        current = self._tilt_position if self._tilt_position is not None else 0
+        if direction_up:
+            self._tilt_position = min(100, int(current + tilt_change))
+        else:
+            self._tilt_position = max(0, int(current - tilt_change))
+
+    async def _wait_for_cover_stop(self) -> None:
+        """Wait until the source cover stops moving."""
+        # Give the cover time to start moving.
+        for _ in range(10):
+            await asyncio.sleep(0.1)
+            if self._is_opening or self._is_closing:
+                break
+        # Wait for the cover to stop (max 120 s).
+        waited = 0.0
+        while (self._is_opening or self._is_closing) and waited < 120:
+            await asyncio.sleep(0.5)
+            waited += 0.5
 
     async def _call_cover_service(self, service: str, data: dict | None = None) -> None:
         """Call cover service on source entity."""
