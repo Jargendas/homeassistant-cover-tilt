@@ -155,8 +155,12 @@ class CoverTiltEntity(CoverEntity):
         # Track movement start/stop for external tilt estimation.
         was_opening = self._is_opening
         was_closing = self._is_closing
-        self._is_opening = state.state == STATE_OPENING
-        self._is_closing = state.state == STATE_CLOSING
+        # Many cover integrations report STATE_OPENING when the cover physically
+        # descends and STATE_CLOSING when it ascends (inverted convention).
+        # Swap the mapping so that the entity always shows "opening" when going
+        # up and "closing" when going down, matching the HA standard.
+        self._is_opening = state.state == STATE_CLOSING
+        self._is_closing = state.state == STATE_OPENING
 
         if (
             not self._performing_tilt_action
