@@ -7,7 +7,8 @@
         "data": {
           "name": "Name",
           "source_entity_id": "Cover entity",
-          "slat_rotation_time": "Time for full slat rotation (seconds)"
+          "slat_rotation_time": "Time for full slat rotation (seconds)",
+          "invert_direction": "Invert movement direction (enable if the cover shows 'opening' when going down)"
         }
       }
     },

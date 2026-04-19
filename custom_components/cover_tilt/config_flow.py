@@ -11,7 +11,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers import selector
 
-from .const import CONF_SLAT_ROTATION_TIME, CONF_SOURCE_ENTITY_ID, DOMAIN
+from .const import CONF_INVERT_DIRECTION, CONF_SLAT_ROTATION_TIME, CONF_SOURCE_ENTITY_ID, DOMAIN
 
 
 class CoverTiltConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -42,6 +42,7 @@ class CoverTiltConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_NAME: title,
                         CONF_SOURCE_ENTITY_ID: entity_id,
                         CONF_SLAT_ROTATION_TIME: rotation_time,
+                        CONF_INVERT_DIRECTION: user_input.get(CONF_INVERT_DIRECTION, False),
                     },
                 )
 
@@ -59,6 +60,7 @@ class CoverTiltConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         unit_of_measurement="s",
                     )
                 ),
+                vol.Optional(CONF_INVERT_DIRECTION, default=False): selector.BooleanSelector(),
             }
         )
 

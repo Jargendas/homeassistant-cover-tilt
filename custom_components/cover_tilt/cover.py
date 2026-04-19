@@ -31,7 +31,7 @@ from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import CONF_SLAT_ROTATION_TIME, CONF_SOURCE_ENTITY_ID
+from .const import CONF_INVERT_DIRECTION, CONF_SLAT_ROTATION_TIME, CONF_SOURCE_ENTITY_ID
 
 
 async def async_setup_entry(
@@ -52,6 +52,7 @@ class CoverTiltEntity(CoverEntity):
         self.hass = hass
         self._source_entity_id: str = entry.data[CONF_SOURCE_ENTITY_ID]
         self._rotation_time: float = entry.data[CONF_SLAT_ROTATION_TIME]
+        self._invert_direction: bool = entry.data.get(CONF_INVERT_DIRECTION, False)
         self._attr_unique_id = f"{entry.entry_id}_tilt"
         self._attr_name = entry.data.get(CONF_NAME)
         self._cover_position: int | None = None
@@ -155,12 +156,16 @@ class CoverTiltEntity(CoverEntity):
         # Track movement start/stop for external tilt estimation.
         was_opening = self._is_opening
         was_closing = self._is_closing
-        # Many cover integrations report STATE_OPENING when the cover physically
-        # descends and STATE_CLOSING when it ascends (inverted convention).
-        # Swap the mapping so that the entity always shows "opening" when going
-        # up and "closing" when going down, matching the HA standard.
-        self._is_opening = state.state == STATE_CLOSING
-        self._is_closing = state.state == STATE_OPENING
+        # Some cover integrations report STATE_OPENING when descending and
+        # STATE_CLOSING when ascending (inverted convention).  The
+        # invert_direction option swaps the mapping so the entity always uses
+        # the HA standard (is_opening = going up, is_closing = going down).
+        if self._invert_direction:
+            self._is_opening = state.state == STATE_CLOSING
+            self._is_closing = state.state == STATE_OPENING
+        else:
+            self._is_opening = state.state == STATE_OPENING
+            self._is_closing = state.state == STATE_CLOSING
 
         if (
             not self._performing_tilt_action
