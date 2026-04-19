@@ -155,8 +155,8 @@ class CoverTiltEntity(CoverEntity):
         # Track movement start/stop for external tilt estimation.
         was_opening = self._is_opening
         was_closing = self._is_closing
-        self._is_opening = state.state == STATE_OPENING
-        self._is_closing = state.state == STATE_CLOSING
+        self._is_opening = state.state == STATE_CLOSING
+        self._is_closing = state.state == STATE_OPENING
 
         if (
             not self._performing_tilt_action
